@@ -19,7 +19,7 @@ description: >
 license: Apache-2.0
 metadata:
   author: Vincent Yin
-  version: "2.2.0"
+  version: "2.2.1"
 ---
 
 # Tech Doc Consistency Checker
@@ -79,14 +79,15 @@ Even a small mismatch in anchor case or punctuation silently breaks navigation i
 **GFM anchor rules:**
 1. Strip inline code backticks, keeping the inner text.
 2. Convert to lowercase.
-3. Remove every character that is not a letter, digit, space, or hyphen.
+3. Remove every character that is not a letter, digit, space, hyphen, or underscore.
 4. Replace each space with a hyphen — one-to-one, so two adjacent spaces become `--`.
 
 **Examples:**
 - `## 2. Phase A — Scaffold a Project` → `#2-phase-a--scaffold-a-project`
 - `### 1.1. Install \`agents-cli\`` → `#11-install-agents-cli`
+- `### 2.2. Type 1 Client: Using \`agent_engines\` SDK` → `#22-type-1-client-using-agent_engines-sdk`
 
-The em-dash `—` is stripped, but the spaces on either side remain, producing `--` in the anchor. This is the most common source of anchor bugs in technical docs.
+The em-dash `—` is stripped, but the spaces on either side remain, producing `--` in the anchor. This is the most common source of anchor bugs in technical docs. Underscores are **preserved** (GFM keeps them), as the `agent_engines` example shows — a frequent trap, since a naive "strip non-alphanumerics" pass drops them and silently breaks the anchor.
 
 Compare each computed anchor against what the TOC actually contains. Fix any mismatch.
 
@@ -264,7 +265,7 @@ A document's filename is often used as a URL slug or navigation label. When it d
 **Slug derivation — apply identically to both the filename (minus `.md` extension) and the H1 title text:**
 1. Strip inline code backticks, keeping the inner text.
 2. Convert to lowercase.
-3. Remove every character that is not a letter, digit, space, or hyphen.
+3. Remove every character that is not a letter, digit, space, hyphen, or underscore.
 4. Replace each space with a hyphen (one-to-one).
 
 **How to check:**
@@ -280,7 +281,7 @@ A document's filename is often used as a URL slug or navigation label. When it d
 | `my-caveman-agent4.md` | `# My Caveman Agent4` | `my-caveman-agent4` | `my-caveman-agent4` | ✓ |
 | `devops-guide.md` | `# DevOps Guide` | `devops-guide` | `devops-guide` | ✓ |
 | `deploy-guide.md` | `# Deployment Guide` | `deploy-guide` | `deployment-guide` | ✗ |
-| `agents_cli_setup.md` | `# Agents CLI Setup` | `agents-cli-setup` | `agents-cli-setup` | ✓ (underscore→hyphen via rule 4) |
+| `agents_cli_setup.md` | `# Agents CLI Setup` | `agents_cli_setup` | `agents-cli-setup` | ✗ (GFM preserves `_`, so the filename's underscores do not match the title's hyphens) |
 
 **Do not flag:**
 - Filenames that are intentionally abbreviated (judgment call — just report the mismatch so the user can decide).
