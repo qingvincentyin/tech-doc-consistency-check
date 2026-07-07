@@ -9,7 +9,9 @@ description: >
   numbers", "proofread my technical writeup", "review this doc for errors", "make sure
   the anchors work", "audit this markdown", or any request to verify or clean up a .md
   file. Checks section numbering, TOC completeness, TOC anchor links (GFM rules including
-  em-dash handling), HTML anchor validity, tech-aware spelling, prose grammar, and
+  em-dash handling), HTML anchor validity, cross-document link and anchor validity
+  (following `file.md#anchor` links to sibling docs to confirm both the file and the
+  anchor exist), tech-aware spelling, prose grammar, and
   hard-wrapped paragraphs that misrender as line breaks in some viewers —
   auto-fixing everything it can and flagging judgment calls for the user. Also handles
   packaging a Markdown doc and its locally referenced images into a ZIP archive — trigger
@@ -19,7 +21,7 @@ description: >
 license: Apache-2.0
 metadata:
   author: Vincent Yin
-  version: "2.2.1"
+  version: "2.3.0"
 ---
 
 # Tech Doc Consistency Checker
@@ -95,13 +97,15 @@ Compare each computed anchor against what the TOC actually contains. Fix any mis
 
 ## Check 4 — HTML Anchor Validity
 
-Some documents use `<a id="..."></a>` anchors for cross-references not tied to headings. Orphaned anchors (defined but never linked) add noise; broken references (linked but undefined) leave readers stranded.
+Some documents use `<a id="..."></a>` anchors for cross-references not tied to headings. Orphaned anchors (defined but never linked) add noise; broken references (linked but undefined) leave readers stranded. An `<a id>` may also be the target of a **cross-doc** link from a sibling document, so this check looks beyond the current file before declaring an anchor orphaned.
 
-1. Collect every `<a id="...">` definition.
-2. Collect every `(#...)` reference that targets one of those IDs (i.e., not a heading anchor).
-3. Verify every reference has a matching definition, and every definition has at least one reference.
+1. Collect every `<a id="...">` definition in this document.
+2. Collect every in-document `(#...)` reference that targets one of those IDs (i.e., not a heading anchor).
+3. Collect every **cross-doc** reference to this document's anchors: scan the other `.md` files in the same directory for links of the form `[text](<THIS_FILENAME#id>)` or `[text](THIS_FILENAME#id)` (angle brackets optional), where `THIS_FILENAME` is the basename of the document being checked.
+4. Verify every in-document reference (step 2) has a matching definition — otherwise it is a **broken reference**.
+5. Verify every definition (step 1) has at least one reference, counting both in-document (step 2) and cross-doc (step 3) references. A definition with only a cross-doc reference is **not** orphaned.
 
-Report orphaned anchors and broken references.
+Report orphaned anchors (no reference anywhere) and broken references.
 
 ---
 
@@ -155,29 +159,35 @@ While extracting prose for spelling (Check 5), also scan for:
 
 ---
 
-## Check 7 — File Link Validity
+## Check 7 — File & Cross-Doc Link Validity
 
-Broken file links are silent — they render as valid Markdown but produce missing images or dead navigation when the document is viewed. Checking them catches moves, renames, and copy-paste errors that no other check covers.
+Broken file links are silent — they render as valid Markdown but produce missing images or dead navigation when the document is viewed. Cross-document links carry a second, independent failure mode: the file may exist but the `#anchor` may point nowhere. This check follows every local link — plain file and cross-doc alike — and verifies the file **and** any anchor. No slack: a `file.md#anchor` link is valid only when the sibling file exists *and* the anchor resolves inside it.
 
-Collect every link whose target is a local file path — that is, any `![alt](target)` or `[text](target)` where `target` is **not** a URL (does not start with `http://` or `https://`) and **not** an in-document anchor (does not start with `#`).
+Collect every link whose target is a local path — any `![alt](target)` or `[text](target)` where `target` is **not** a URL (does not start with `http://` or `https://`) and **not** a purely in-document anchor (does not start with `#`). A destination wrapped in angle brackets — `[text](<My Doc.md#anchor>)`, the form used when the path contains spaces — counts here; strip the surrounding `<` and `>` first.
 
-For each such link:
-- If the path is relative, resolve it relative to the directory containing the document being checked.
-- If the path is absolute, use it as-is.
-- Check whether the file exists on disk.
+Normalize and check each target:
+1. Strip a surrounding `<…>` if present.
+2. Split off a trailing `#fragment` (everything from the first `#` onward). Keep both the **file part** and the **fragment**.
+3. Resolve the file part: relative paths against the directory containing the document being checked; absolute paths as-is. Verify the file exists on disk. If it does not → **broken link** (report; do not auto-fix — the correct path is unknowable without the user's input).
+4. If a `#fragment` is present **and** the file part exists **and** the file part is a Markdown file (`.md`), open that file and verify the fragment resolves to a real anchor in it. The fragment resolves if it matches **either**:
+   - the **GFM slug** of one of that document's headings (compute slugs with the Check 3 rules), **or**
+   - an explicit `<a id="fragment">` anchor defined in that document.
+   If it matches neither → **broken anchor** (report; do not auto-fix). Report the fragment and the target filename so the user can see which slug drifted.
 
-Report every link whose target file does not exist. Do not attempt to auto-fix — the correct path is unknowable without the user's input.
+A target whose file part is empty (`#anchor` alone) is a purely in-document anchor and is out of scope here — Checks 3 and 4 own it.
 
 **Examples of targets to check:**
-- `./images/diagram.png`
-- `../shared/glossary.md`
-- `/Users/vyin/docs/setup.md`
-- `images/screenshot.jpg` (no leading `./`, still relative)
+- `./images/diagram.png` — file must exist.
+- `images/screenshot.jpg` (no leading `./`, still relative) — file must exist.
+- `../shared/glossary.md` — file must exist (no fragment to validate).
+- `/Users/vyin/docs/setup.md` — absolute path, file must exist.
+- `<DevOps Guide to agents-cli.md#57-agent-engine-grant-the-runtime-service-agent-bucket-access>` — sibling `.md` must exist **and** a heading whose GFM slug is `57-agent-engine-grant-the-runtime-service-agent-bucket-access` must exist in it.
+- `<DevOps Guide to agents-cli.md#adk-a2a-on-cloud-run>` — sibling `.md` must exist **and** an `<a id="adk-a2a-on-cloud-run">` (or a heading with that slug) must exist in it.
 
 **Examples of targets to skip:**
 - `https://example.com/docs` (URL)
 - `http://localhost:8080` (URL)
-- `#section-heading` (in-document anchor)
+- `#section-heading` (purely in-document anchor — Checks 3 and 4 own it)
 
 ---
 
@@ -328,7 +338,7 @@ Run checks in this order; fixing as you go ensures later checks see the correcte
 4. HTML Anchor Validity
 5. Spelling
 6. Basic Prose Grammar
-7. File Link Validity
+7. File & Cross-Doc Link Validity
 8. Image Alt Text
 9. Protocol Layering Precision
 10. Heading Level Increments
@@ -345,7 +355,7 @@ After all checks, report:
 | HTML Anchor Validity | N | N |
 | Spelling | N | N |
 | Prose Grammar | N | N |
-| File Link Validity | N | N |
+| File & Cross-Doc Link Validity | N | — |
 | Image Alt Text | N | N |
 | Protocol Layering Precision | N | N |
 | Heading Level Increments | N | — |
