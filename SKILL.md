@@ -22,7 +22,7 @@ description: >
 license: Apache-2.0
 metadata:
   author: Vincent Yin
-  version: "2.4.0"
+  version: "2.4.1"
 ---
 
 # Tech Doc Consistency Checker
@@ -387,7 +387,7 @@ done
 
 The `-j` flag places the document at the ZIP root (no parent path). The image loop adds each image under its relative `images/` path. Only files actually referenced in the document are included — not the entire `images/` folder.
 
-**Naming:** Same as the document filename (e.g., `My Guide.md` → `My Guide.zip`), placed in the same directory.
+**Naming:** If the user dictated an archive name in the request (e.g., "zip this doc to `tech-guide.zip`"), honor that name exactly. Otherwise name it the same as the document filename (e.g., `My Guide.md` → `My Guide.zip`). Place it in the same directory.
 
 ### Multiple Documents (One Combined ZIP)
 
@@ -405,7 +405,7 @@ done
 
 The `-j` flag places all docs at the ZIP root, side by side. The `cat ... | grep` collects image references across **all** the docs at once, and `sort -u` dedupes them, so an image referenced by more than one doc is added only once into the single shared `images/` folder.
 
-**Naming:** No single filename applies, so invent a short name that summarizes the set — e.g., for `DevOps Guide to agents-cli.md` + `Infra Guide to GCP AI Agents.md`, a name like `DevOps and Infra Guide.zip` or `Guide to Agents.zip`. Place it in the same directory.
+**Naming:** If the user dictated an archive name in the request (e.g., "zip up both docs to `tech-guide.zip`"), honor that name exactly. Otherwise no single filename applies, so invent a short name that summarizes the set — e.g., for `DevOps Guide to agents-cli.md` + `Infra Guide to GCP AI Agents.md`, a name like `DevOps and Infra Guide.zip` or `Guide to Agents.zip`. Place it in the same directory.
 
 ### After Zipping (Both Cases)
 
