@@ -14,14 +14,15 @@ description: >
   anchor exist), tech-aware spelling, prose grammar, and
   hard-wrapped paragraphs that misrender as line breaks in some viewers —
   auto-fixing everything it can and flagging judgment calls for the user. Also handles
-  packaging a Markdown doc and its locally referenced images into a ZIP archive — trigger
-  on "zip up this doc", "package this doc into a zip file", "create a zip from this doc",
-  "zip this markdown with its images", or any request to bundle/archive a .md file for
-  sharing.
+  packaging a Markdown doc and its locally referenced images into a ZIP archive, including
+  bundling multiple sibling docs into one combined archive with a merged images/ folder —
+  trigger on "zip up this doc", "package this doc into a zip file", "create a zip from this
+  doc", "zip this markdown with its images", "zip up these docs", or any request to
+  bundle/archive one or more .md files for sharing.
 license: Apache-2.0
 metadata:
   author: Vincent Yin
-  version: "2.3.0"
+  version: "2.4.0"
 ---
 
 # Tech Doc Consistency Checker
@@ -366,11 +367,13 @@ If any issue required a judgment call and was not auto-fixed, list it explicitly
 
 ---
 
-## On-Demand: Package Document into a ZIP
+## On-Demand: Package Document(s) into a ZIP
 
-**Only do this when the user explicitly asks** — e.g., "package the doc into a ZIP file", "ZIP up this doc", "create a zip file for this doc". Do NOT run this automatically as part of the consistency check.
+**Only do this when the user explicitly asks** — e.g., "package the doc into a ZIP file", "ZIP up this doc", "create a zip file for this doc", "zip up these docs". Do NOT run this automatically as part of the consistency check.
 
-Creates a ZIP archive containing the document and all locally referenced image files, preserving the relative folder structure so images load correctly when extracted anywhere.
+Creates a ZIP archive containing the document(s) and all locally referenced image files, preserving the relative folder structure so images load correctly when extracted anywhere. This handles both a single doc and multiple docs bundled into one archive.
+
+### Single Document
 
 Run from the directory containing the document:
 
@@ -385,3 +388,25 @@ done
 The `-j` flag places the document at the ZIP root (no parent path). The image loop adds each image under its relative `images/` path. Only files actually referenced in the document are included — not the entire `images/` folder.
 
 **Naming:** Same as the document filename (e.g., `My Guide.md` → `My Guide.zip`), placed in the same directory.
+
+### Multiple Documents (One Combined ZIP)
+
+When the user asks to bundle 2 or more docs into **one** archive (rather than zipping each separately), the docs are all **siblings** — at the same folder level — so their on-disk layout already parallels the ZIP layout and no folder re-mapping is needed. The archive gets **one combined `images/` folder** holding the union of images referenced by any of the docs.
+
+Run from the shared directory:
+
+```bash
+cd "<doc-directory>" && \
+zip -j "<archive>.zip" "<doc1>" "<doc2>" [...] && \
+cat "<doc1>" "<doc2>" [...] | grep -o '](images/[^)]*' | sed 's/^](//' | sort -u | while read img; do
+  zip "<archive>.zip" "$img"
+done
+```
+
+The `-j` flag places all docs at the ZIP root, side by side. The `cat ... | grep` collects image references across **all** the docs at once, and `sort -u` dedupes them, so an image referenced by more than one doc is added only once into the single shared `images/` folder.
+
+**Naming:** No single filename applies, so invent a short name that summarizes the set — e.g., for `DevOps Guide to agents-cli.md` + `Infra Guide to GCP AI Agents.md`, a name like `DevOps and Infra Guide.zip` or `Guide to Agents.zip`. Place it in the same directory.
+
+### After Zipping (Both Cases)
+
+Move the finished `.zip` to `~/Downloads`.
