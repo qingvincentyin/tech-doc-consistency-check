@@ -22,7 +22,7 @@ description: >
 license: Apache-2.0
 metadata:
   author: Vincent Yin
-  version: "2.4.1"
+  version: "2.4.5"
 ---
 
 # Tech Doc Consistency Checker
@@ -105,6 +105,8 @@ Some documents use `<a id="..."></a>` anchors for cross-references not tied to h
 3. Collect every **cross-doc** reference to this document's anchors: scan the other `.md` files in the same directory for links of the form `[text](<THIS_FILENAME#id>)` or `[text](THIS_FILENAME#id)` (angle brackets optional), where `THIS_FILENAME` is the basename of the document being checked.
 4. Verify every in-document reference (step 2) has a matching definition — otherwise it is a **broken reference**.
 5. Verify every definition (step 1) has at least one reference, counting both in-document (step 2) and cross-doc (step 3) references. A definition with only a cross-doc reference is **not** orphaned.
+
+**Exception — table-row anchors.** Do not flag an unreferenced anchor when it sits in a **table row** and the anchoring is a consistent per-row pattern in that table — that is, other rows of the same table also carry `<a id>` anchors. Such anchors exist for symmetry across the rows and as ready-made link targets: a row may not be referenced today but is likely to be linked later, and pre-placing the anchor means the table need not be edited when that time comes. The anchor is intentional structure, not noise. (A lone `<a id>` in a table where no other row is anchored does not qualify — that is a one-off and is still subject to the orphaned-anchor check.)
 
 Report orphaned anchors (no reference anywhere) and broken references.
 
@@ -238,6 +240,7 @@ In diagrams and prose, protocols are often written as `X / Y` when X is actually
 - `HTTP or gRPC` — the word "or" already makes the choice explicit.
 - `TCP/IP` — this is a single compound name, not a slash-ambiguity case.
 - `CI/CD` — an established compound abbreviation, not a protocol expression.
+- `REST/gRPC` (and the reverse, `gRPC/REST`) — REST and gRPC are two alternative interface styles the same API offers (as in a "REST/gRPC API"), not a layered protocol. The slash names one dual-interface API, not "REST over gRPC".
 - Established compound industry terms where the slash is part of the term itself, not a separator between two independent concepts (e.g., `no-code / low-code`, `read / write`, `input / output`). When in doubt, ask: would removing one side leave the other side meaningful in context? If the two sides form a recognized spectrum or pair, leave the slash.
 
 ---
@@ -246,7 +249,7 @@ In diagrams and prose, protocols are often written as `X / Y` when X is actually
 
 Skipping a heading level (e.g., jumping from `#` directly to `###`) breaks the document outline and confuses screen readers and document parsers that rely on a strict hierarchy.
 
-**Rule:** When traversing headings in document order, the level of each heading may exceed the previous heading's level by **at most 1**. Decreasing by any amount is allowed.
+**Rule:** When traversing headings in document order, the level of each heading may exceed the previous heading's level by **at most 1**. Decreasing by any amount is allowed. Sidebar and named-callout headings are exempt — see the exception below.
 
 **How to check:**
 1. Extract all headings in order (excluding lines inside fenced code blocks), recording each heading's level (number of leading `#` characters).
@@ -264,6 +267,8 @@ Skipping a heading level (e.g., jumping from `#` directly to `###`) breaks the d
 | `## Section` (2) | `##### Deep` (5) | +3 | ✗ skips levels 3 and 4 |
 
 Do not auto-fix — the correct repair depends on intent (promote the child, demote the child, or insert an intermediate heading).
+
+**Exception — Sidebar and named-callout headings.** Sidebar headings (and similar named callout blocks such as `Note:` or `Example:` headings) are exempt from this check. They deliberately break the numbering and nesting convention — a `##### Sidebar N: …` is routinely placed one level deeper than a strict +1 from its parent content heading, so the same document keeps all sidebars at a uniform depth. Normal content headings still follow the strict at-most-+1 rule. Identify a sidebar/named-callout heading by its text (e.g. it begins with `Sidebar`, `Note:`, or `Example:`), and exclude it from the traversal **entirely**: do not flag the sidebar itself as a skip, and skip over it when computing the increment for the next real heading — so its off-convention level neither triggers a false flag nor masks a genuine skip in the surrounding content headings.
 
 ---
 
