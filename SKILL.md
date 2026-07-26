@@ -22,7 +22,7 @@ description: >
 license: Apache-2.0
 metadata:
   author: Vincent Yin
-  version: "2.4.5"
+  version: "2.4.7"
 ---
 
 # Tech Doc Consistency Checker
@@ -42,6 +42,8 @@ Numbered headings are a navigation contract with the reader: when a section is a
 2. For top-level numbered sections (e.g., `## 1.`, `## 2.`), verify they run 1, 2, 3, … with no skips.
 3. For each subsection group (e.g., `### 2.1`, `### 2.2`), verify they run .1, .2, .3, … with no skips.
 4. Verify subsection prefixes match their parent (e.g., all subsections of `## 3.` start with `3.`).
+
+**Exception — un-numbered named headings, and optional diagram headings.** Some headings are intentionally un-numbered even when nested among numbered siblings, and are not flagged as missing a section number: `Sidebar N:` headings, `System Diagram N:` headings, and similar named callouts (`Note:`, `Example:`). They carry their own label sequence instead of a section number and do not take a slot in their parent's section numbering. Two points specific to diagrams: (1) a `System Diagram N` may appear either as an un-numbered heading or as an inline bold caption — both are acceptable, so never flag a diagram for having, or for lacking, a heading; (2) the `System Diagram N` labels form their own sequence and should be consecutive (1, 2, 3, …) in document order, the same consecutiveness numbered sections follow. Unlike a Sidebar, a diagram that IS a heading follows the normal nesting rule (see Check 10).
 
 **Common issues:**
 - A section was added or removed but siblings were not renumbered.
@@ -268,7 +270,7 @@ Skipping a heading level (e.g., jumping from `#` directly to `###`) breaks the d
 
 Do not auto-fix — the correct repair depends on intent (promote the child, demote the child, or insert an intermediate heading).
 
-**Exception — Sidebar and named-callout headings.** Sidebar headings (and similar named callout blocks such as `Note:` or `Example:` headings) are exempt from this check. They deliberately break the numbering and nesting convention — a `##### Sidebar N: …` is routinely placed one level deeper than a strict +1 from its parent content heading, so the same document keeps all sidebars at a uniform depth. Normal content headings still follow the strict at-most-+1 rule. Identify a sidebar/named-callout heading by its text (e.g. it begins with `Sidebar`, `Note:`, or `Example:`), and exclude it from the traversal **entirely**: do not flag the sidebar itself as a skip, and skip over it when computing the increment for the next real heading — so its off-convention level neither triggers a false flag nor masks a genuine skip in the surrounding content headings.
+**Exception — Sidebar and named-callout headings.** Sidebar headings (and similar named callout blocks such as `Note:` or `Example:` headings) are exempt from this check. They deliberately break the numbering and nesting convention — a `##### Sidebar N: …` is routinely placed one level deeper than a strict +1 from its parent content heading, so the same document keeps all sidebars at a uniform depth. Normal content headings still follow the strict at-most-+1 rule. Identify a sidebar/named-callout heading by its text (e.g. it begins with `Sidebar`, `Note:`, or `Example:`), and exclude it from the traversal **entirely**: do not flag the sidebar itself as a skip, and skip over it when computing the increment for the next real heading — so its off-convention level neither triggers a false flag nor masks a genuine skip in the surrounding content headings. `System Diagram N:` headings are NOT covered by this exception: unlike a Sidebar, a diagram heading follows the normal at-most-+1 nesting rule (a diagram under a `####` subsection is a `#####` heading, a +1 step) and is included in the traversal normally. A diagram rendered as an inline caption has no heading, so this check does not apply to it.
 
 ---
 
