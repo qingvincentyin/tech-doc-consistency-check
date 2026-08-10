@@ -11,7 +11,9 @@ description: >
   file. Checks section numbering, TOC completeness, TOC anchor links (GFM rules including
   em-dash handling), HTML anchor validity, cross-document link and anchor validity
   (following `file.md#anchor` links to sibling docs to confirm both the file and the
-  anchor exist), tech-aware spelling, prose grammar, and
+  anchor exist), tech-aware spelling, prose grammar, heading-level nesting (including
+  un-numbered named headings such as `Sidebar N:` and `Figure N:`, which must sit exactly
+  one level below their parent section), and
   hard-wrapped paragraphs that misrender as line breaks in some viewers —
   auto-fixing everything it can and flagging judgment calls for the user. Also handles
   packaging a Markdown doc and its locally referenced images into a ZIP archive, including
@@ -22,7 +24,7 @@ description: >
 license: Apache-2.0
 metadata:
   author: Vincent Yin
-  version: "2.4.7"
+  version: "2.5.0"
 ---
 
 # Tech Doc Consistency Checker
@@ -43,7 +45,7 @@ Numbered headings are a navigation contract with the reader: when a section is a
 3. For each subsection group (e.g., `### 2.1`, `### 2.2`), verify they run .1, .2, .3, … with no skips.
 4. Verify subsection prefixes match their parent (e.g., all subsections of `## 3.` start with `3.`).
 
-**Exception — un-numbered named headings, and optional diagram headings.** Some headings are intentionally un-numbered even when nested among numbered siblings, and are not flagged as missing a section number: `Sidebar N:` headings, `System Diagram N:` headings, and similar named callouts (`Note:`, `Example:`). They carry their own label sequence instead of a section number and do not take a slot in their parent's section numbering. Two points specific to diagrams: (1) a `System Diagram N` may appear either as an un-numbered heading or as an inline bold caption — both are acceptable, so never flag a diagram for having, or for lacking, a heading; (2) the `System Diagram N` labels form their own sequence and should be consecutive (1, 2, 3, …) in document order, the same consecutiveness numbered sections follow. Unlike a Sidebar, a diagram that IS a heading follows the normal nesting rule (see Check 10).
+**Exception — un-numbered named headings, and optional diagram headings.** Some headings are intentionally un-numbered even when nested among numbered siblings, and are not flagged as missing a section number: `Sidebar N:` headings, `System Diagram N:` headings, and similar named callouts (`Note:`, `Example:`). They carry their own label sequence instead of a section number and do not take a slot in their parent's section numbering. ⚠️ **The exemption covers numbering only, never nesting.** Every one of these headings must still sit exactly one level deeper than the content heading it belongs to — see [Check 10a](#check-10a--un-numbered-named-headings-nest-exactly-one-level-deeper). Two points specific to diagrams: (1) a `System Diagram N` may appear either as an un-numbered heading or as an inline bold caption — both are acceptable, so never flag a diagram for having, or for lacking, a heading; (2) the `System Diagram N` labels form their own sequence and should be consecutive (1, 2, 3, …) in document order, the same consecutiveness numbered sections follow.
 
 **Common issues:**
 - A section was added or removed but siblings were not renumbered.
@@ -251,7 +253,7 @@ In diagrams and prose, protocols are often written as `X / Y` when X is actually
 
 Skipping a heading level (e.g., jumping from `#` directly to `###`) breaks the document outline and confuses screen readers and document parsers that rely on a strict hierarchy.
 
-**Rule:** When traversing headings in document order, the level of each heading may exceed the previous heading's level by **at most 1**. Decreasing by any amount is allowed. Sidebar and named-callout headings are exempt — see the exception below.
+**Rule:** When traversing headings in document order, the level of each heading may exceed the previous heading's level by **at most 1**. Decreasing by any amount is allowed. Un-numbered named headings (`Sidebar N:`, `Figure N:`, `System Diagram N:`, `Note:`, `Example:`) are held to a **stricter** rule — exactly +1 from their parent content heading, never more and never less. See the sub-rule below.
 
 **How to check:**
 1. Extract all headings in order (excluding lines inside fenced code blocks), recording each heading's level (number of leading `#` characters).
@@ -270,7 +272,24 @@ Skipping a heading level (e.g., jumping from `#` directly to `###`) breaks the d
 
 Do not auto-fix — the correct repair depends on intent (promote the child, demote the child, or insert an intermediate heading).
 
-**Exception — Sidebar and named-callout headings.** Sidebar headings (and similar named callout blocks such as `Note:` or `Example:` headings) are exempt from this check. They deliberately break the numbering and nesting convention — a `##### Sidebar N: …` is routinely placed one level deeper than a strict +1 from its parent content heading, so the same document keeps all sidebars at a uniform depth. Normal content headings still follow the strict at-most-+1 rule. Identify a sidebar/named-callout heading by its text (e.g. it begins with `Sidebar`, `Note:`, or `Example:`), and exclude it from the traversal **entirely**: do not flag the sidebar itself as a skip, and skip over it when computing the increment for the next real heading — so its off-convention level neither triggers a false flag nor masks a genuine skip in the surrounding content headings. `System Diagram N:` headings are NOT covered by this exception: unlike a Sidebar, a diagram heading follows the normal at-most-+1 nesting rule (a diagram under a `####` subsection is a `#####` heading, a +1 step) and is included in the traversal normally. A diagram rendered as an inline caption has no heading, so this check does not apply to it.
+### Check 10a — Un-Numbered Named Headings Nest Exactly One Level Deeper
+
+**Rule:** An un-numbered named heading — `Sidebar N:`, `Figure N:`, `System Diagram N:`, `Note:`, `Example:`, and similar named callouts — sits at **exactly one level deeper than the content heading it belongs to**. Not two or more (a skip), and not the same level or shallower (which would make it a sibling of the section instead of a child of it). A sidebar under a `### 1.1.` heading is `#### Sidebar 1: …`; a sidebar under a `#### 6.3.1.` heading is `##### Sidebar 4: …`.
+
+**Why it is strict.** GitHub builds its rendered Table of Contents from heading levels. A skipped level inserts a phantom nesting step, so the entry indents one notch too far and every reader sees the sidebar filed under something that does not exist. The same skip is what a `<h3>` → `<h5>` jump does to screen-reader outline navigation.
+
+⛔ **This supersedes the former exemption.** Until 2026-08-10 this check exempted Sidebar and named-callout headings from nesting entirely, on the theory that a document should keep all its sidebars at one uniform depth. That is retired. Uniform depth across the document is **not** a goal — a sidebar's level follows its own parent, so sidebars under different-depth sections correctly land at different depths.
+
+**How to check:**
+1. Walk the headings in document order, tracking the level of the most recent **content** heading (any heading that is not an un-numbered named heading).
+2. For each un-numbered named heading, flag it unless its level is exactly `parent_content_level + 1`.
+3. Report the fix as a level change on the heading, and remember it also changes that entry's indent in a hand-maintained Table of Contents (Check 3).
+
+**Interaction with the main Check 10 traversal:** exclude un-numbered named headings when computing the increment between consecutive *content* headings, so an un-numbered heading neither triggers a false flag on the next content heading nor masks a genuine skip between two content headings. Check them only against their parent content heading, per the rule above.
+
+**Auto-fix:** unlike the main Check 10, this one is auto-fixable. The intent is unambiguous — the heading belongs to the section above it — so change the heading's level to `parent_content_level + 1` and re-indent its TOC entry to match. Changing a heading's level does not change its GFM slug, so no anchor or cross-reference breaks.
+
+**Related:** a `System Diagram N` may appear either as an un-numbered heading or as an inline bold caption. Both are acceptable, so never flag a diagram for having, or for lacking, a heading. This check applies only when it *is* a heading.
 
 ---
 
@@ -350,6 +369,7 @@ Run checks in this order; fixing as you go ensures later checks see the correcte
 8. Image Alt Text
 9. Protocol Layering Precision
 10. Heading Level Increments
+10a. Un-Numbered Named Heading Nesting
 11. Filename vs. Title Agreement
 12. Embedded Line Breaks in Paragraphs
 
@@ -367,6 +387,7 @@ After all checks, report:
 | Image Alt Text | N | N |
 | Protocol Layering Precision | N | N |
 | Heading Level Increments | N | — |
+| Un-Numbered Named Heading Nesting | N | N |
 | Filename vs. Title Agreement | N | — |
 | Embedded Line Breaks in Paragraphs | N | — |
 
